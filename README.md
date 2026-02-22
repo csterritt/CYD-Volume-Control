@@ -21,4 +21,4 @@ While a button is being held down, the keyboard command should be sent repeatedl
 and the colors of the button should invert to indicate that it is being held down.
 
 Inspiration, and code, from the
-(CYD-MIDI-Controller)[https://github.com/NickCulbertson/CYD-MIDI-Controller.git] project.
+[CYD-MIDI-Controller](https://github.com/NickCulbertson/CYD-MIDI-Controller.git) project.
