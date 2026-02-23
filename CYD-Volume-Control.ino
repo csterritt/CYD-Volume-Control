@@ -1,7 +1,7 @@
 /*******************************************************************
  Volume Control for ESP32 Cheap Yellow Display
- Sends USB HID Consumer Control commands (Volume Up, Mute, Volume Down)
- via the ESP32-S3 native USB interface.
+ Sends BLE HID media key commands (Volume Up, Mute, Volume Down)
+ via Bluetooth Low Energy keyboard emulation.
  *******************************************************************/
 
 #include <SPI.h>
@@ -29,9 +29,9 @@ TouchState touch;
 
 // Button definitions — Volume Up | Mute | Volume Down (left to right)
 ButtonGeometry buttons[NUM_BUTTONS] = {
-  { BTN_START_X,                          BTN_Y, BTN_WIDTH, BTN_HEIGHT, "VOL+", BTN_VOL_UP   },
-  { BTN_START_X + BTN_WIDTH + BTN_GAP,    BTN_Y, BTN_WIDTH, BTN_HEIGHT, "MUTE", BTN_MUTE     },
-  { BTN_START_X + 2*(BTN_WIDTH + BTN_GAP), BTN_Y, BTN_WIDTH, BTN_HEIGHT, "VOL-", BTN_VOL_DOWN }
+  { BTN_START_X,                          BTN_Y, BTN_WIDTH, BTN_HEIGHT, "V +", BTN_VOL_UP   },
+  { BTN_START_X + BTN_WIDTH + BTN_GAP,    BTN_Y, BTN_WIDTH, BTN_HEIGHT, "M", BTN_MUTE     },
+  { BTN_START_X + 2*(BTN_WIDTH + BTN_GAP), BTN_Y, BTN_WIDTH, BTN_HEIGHT, "V -", BTN_VOL_DOWN }
 };
 
 // Repeat-while-held timing
@@ -44,6 +44,10 @@ unsigned long pressStartTime = 0;
 unsigned long lastRepeatTime = 0;
 bool initialCommandSent      = false;
 bool repeatStarted           = false;
+bool wasConnected            = false;
+
+// Forward declaration
+void drawConnectionStatus(bool connected);
 
 // Forward declarations
 void handleButtonPress(ButtonId btn);
@@ -62,15 +66,23 @@ void setup() {
   tft.setRotation(1);
   pinMode(21, OUTPUT);
   digitalWrite(21, HIGH);
-  // USB HID setup
+  // BLE HID setup
   initializeHID();
-  Serial.println("USB HID initialized");
-  // Draw the three buttons
+  Serial.println("BLE HID keyboard starting...");
+  // Draw the three buttons and initial status
   drawAllButtons();
+  drawConnectionStatus(false);
   Serial.println("Volume Control ready!");
 }
 
 void loop() {
+  // Update BLE connection status indicator when state changes
+  bool connected = isHIDConnected();
+  if (connected != wasConnected) {
+    wasConnected = connected;
+    drawConnectionStatus(connected);
+  }
+
   updateTouch();
   ButtonId currentBtn = getActiveButton();
   if (touch.justPressed && currentBtn != BTN_NONE) {
@@ -87,6 +99,13 @@ void loop() {
   }
 
   delay(20);
+}
+
+// Draw a small BLE status label in the strip below the buttons
+void drawConnectionStatus(bool connected) {
+  tft.fillRect(0, 226, 320, 14, SCREEN_BG);
+  tft.setTextColor(connected ? 0x07E0 : 0xF800, SCREEN_BG);
+  tft.drawCentreString(connected ? "BLE: CONNECTED" : "BLE: WAITING...", 160, 228, 1);
 }
 
 // Called once on the rising edge of a touch inside a button
