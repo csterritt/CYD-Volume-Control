@@ -29,14 +29,16 @@ static const uint8_t CONSUMER_REPORT_DESC[] = {
 
 static BLEHIDDevice* hidDevice = nullptr;
 static BLECharacteristic* inputReport = nullptr;
-static bool hidConnected = false;
+static volatile bool hidConnected = false;
 
 class HIDServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer* server) override {
     hidConnected = true;
+    Serial.println("HID: client connected");
   }
   void onDisconnect(BLEServer* server) override {
     hidConnected = false;
+    Serial.println("HID: client disconnected, re-advertising");
     BLEDevice::startAdvertising();
   }
 };
@@ -44,12 +46,6 @@ class HIDServerCallbacks : public BLEServerCallbacks {
 // Initialize BLE HID — call in setup()
 void initializeHID() {
   BLEDevice::init("CYD Volume");
-  // macOS requires bonding + encryption for BLE HID devices
-  BLESecurity* security = new BLESecurity();
-  security->setAuthenticationMode(ESP_LE_AUTH_BOND);
-  security->setCapability(ESP_IO_CAP_NONE);
-  security->setInitEncryptionKey(ESP_BLE_ENC_KEY_MASK | ESP_BLE_ID_KEY_MASK);
-
   BLEServer* server = BLEDevice::createServer();
   server->setCallbacks(new HIDServerCallbacks());
 
@@ -57,6 +53,7 @@ void initializeHID() {
   hidDevice->manufacturer()->setValue("Espressif");
   hidDevice->pnp(0x02, 0x045E, 0x0000, 0x0110);
   hidDevice->hidInfo(0x00, 0x01);
+  hidDevice->setBatteryLevel(100);
   hidDevice->reportMap((uint8_t*)CONSUMER_REPORT_DESC, sizeof(CONSUMER_REPORT_DESC));
   inputReport = hidDevice->inputReport(1);
   hidDevice->startServices();
@@ -75,7 +72,8 @@ bool isHIDConnected() {
 
 // Send a 1-byte consumer control report then release
 static void sendConsumerKey(uint8_t mask) {
-  if (!hidConnected || !inputReport) return;
+  if (!inputReport) return;
+  Serial.printf("HID send: connected=%d mask=0x%02X\n", (bool)hidConnected, mask);
   inputReport->setValue(&mask, 1);
   inputReport->notify();
   delay(10);
