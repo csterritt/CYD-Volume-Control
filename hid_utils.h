@@ -7,23 +7,19 @@
 #include <BLEHIDDevice.h>
 
 // Consumer control HID report descriptor.
-// Bits: 0=Volume Increment (0xE9), 1=Volume Decrement (0xEA), 2=Mute (0xE2),
-//       3-7=padding to fill 1 byte.
+// 16-bit array: sends one usage code at a time (0x0000 = release).
 static const uint8_t CONSUMER_REPORT_DESC[] = {
   0x05, 0x0C,        // Usage Page (Consumer)
   0x09, 0x01,        // Usage (Consumer Control)
   0xA1, 0x01,        // Collection (Application)
   0x85, 0x01,        //   Report ID (1)
-  0x09, 0xE9,        //   Usage (Volume Increment)
-  0x09, 0xEA,        //   Usage (Volume Decrement)
-  0x09, 0xE2,        //   Usage (Mute)
   0x15, 0x00,        //   Logical Minimum (0)
-  0x25, 0x01,        //   Logical Maximum (1)
-  0x75, 0x01,        //   Report Size (1 bit)
-  0x95, 0x03,        //   Report Count (3)
-  0x81, 0x02,        //   Input (Data, Variable, Absolute)
-  0x95, 0x05,        //   Report Count (5) — padding to byte boundary
-  0x81, 0x03,        //   Input (Constant)
+  0x26, 0xFF, 0x03,  //   Logical Maximum (1023)
+  0x19, 0x00,        //   Usage Minimum (0)
+  0x2A, 0xFF, 0x03,  //   Usage Maximum (1023)
+  0x75, 0x10,        //   Report Size (16 bits)
+  0x95, 0x01,        //   Report Count (1)
+  0x81, 0x00,        //   Input (Data, Array, Absolute)
   0xC0               // End Collection
 };
 
@@ -70,30 +66,31 @@ bool isHIDConnected() {
   return hidConnected;
 }
 
-// Send a 1-byte consumer control report then release
-static void sendConsumerKey(uint8_t mask) {
+// Send a 16-bit consumer usage code then release (0x0000)
+static void sendConsumerKey(uint16_t usageCode) {
   if (!inputReport) return;
-  Serial.printf("HID send: connected=%d mask=0x%02X\n", (bool)hidConnected, mask);
-  inputReport->setValue(&mask, 1);
+  Serial.printf("HID send: connected=%d usage=0x%04X\n", (bool)hidConnected, usageCode);
+  uint8_t report[2] = { (uint8_t)(usageCode & 0xFF), (uint8_t)(usageCode >> 8) };
+  inputReport->setValue(report, 2);
   inputReport->notify();
   delay(10);
-  uint8_t release = 0x00;
-  inputReport->setValue(&release, 1);
+  uint8_t release[2] = {0x00, 0x00};
+  inputReport->setValue(release, 2);
   inputReport->notify();
 }
 
 void sendVolumeUp() {
-  sendConsumerKey(0x01);
+  sendConsumerKey(0x00E9);  // Volume Increment
   Serial.println("VOL_UP");
 }
 
 void sendVolumeDown() {
-  sendConsumerKey(0x02);
+  sendConsumerKey(0x00EA);  // Volume Decrement
   Serial.println("VOL_DN");
 }
 
 void sendMute() {
-  sendConsumerKey(0x04);
+  sendConsumerKey(0x00E2);  // Mute
   Serial.println("MUTE");
 }
 
