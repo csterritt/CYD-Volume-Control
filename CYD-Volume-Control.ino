@@ -39,6 +39,12 @@ ButtonGeometry buttons[NUM_BUTTONS] = {
 const unsigned long REPEAT_INITIAL_DELAY = 400;  // ms before first repeat
 const unsigned long REPEAT_INTERVAL      = 100;  // ms between subsequent repeats
 
+// Screen power management
+const unsigned long SCREEN_TIMEOUT = 30000;     // 30 seconds
+unsigned long lastTouchTime = 0;
+bool screenAwake = true;
+bool firstTouchAfterWake = false;
+
 // State tracking
 ButtonId activeButton        = BTN_NONE;
 unsigned long pressStartTime = 0;
@@ -47,8 +53,10 @@ bool initialCommandSent      = false;
 bool repeatStarted           = false;
 bool wasConnected            = false;
 
-// Forward declaration
+// Forward declarations
 void drawConnectionStatus(bool connected);
+void blankScreen();
+void wakeScreen();
 
 // Forward declarations
 void handleButtonPress(ButtonId btn);
@@ -70,6 +78,8 @@ void setup() {
   // Draw buttons and initial status before blocking WiFi connect
   drawAllButtons();
   drawConnectionStatus(false);
+  // Initialize screen power management
+  lastTouchTime = millis();
   // WiFi setup
   initializeWiFi();
   drawConnectionStatus(isWiFiConnected());
@@ -84,19 +94,45 @@ void loop() {
     drawConnectionStatus(connected);
   }
 
+  // Handle screen power management
+  if (screenAwake && (millis() - lastTouchTime > SCREEN_TIMEOUT)) {
+    blankScreen();
+  }
+
   updateTouch();
-  ButtonId currentBtn = getActiveButton();
-  if (touch.justPressed && currentBtn != BTN_NONE) {
-    handleButtonPress(currentBtn);
-  } else if (touch.isPressed && activeButton != BTN_NONE) {
-    // Finger may have slid off the original button
-    if (currentBtn == activeButton) {
-      handleButtonHeld(activeButton);
+
+  // Update last touch time if screen is touched
+  if (touch.justPressed) {
+    lastTouchTime = millis();
+
+    // Handle wake-up from screen off
+    if (!screenAwake) {
+      wakeScreen();
+      return; // Skip button processing on first touch after wake
+    }
+
+    // Handle first touch after wake (don't activate buttons)
+    if (firstTouchAfterWake) {
+      firstTouchAfterWake = false;
+      return; // Skip button processing on first touch after wake
     }
   }
 
-  if (touch.justReleased && activeButton != BTN_NONE) {
-    handleButtonRelease(activeButton);
+  // Only process button touches if screen is awake and not in first-touch-after-wake state
+  if (screenAwake && !firstTouchAfterWake) {
+    ButtonId currentBtn = getActiveButton();
+    if (touch.justPressed && currentBtn != BTN_NONE) {
+      handleButtonPress(currentBtn);
+    } else if (touch.isPressed && activeButton != BTN_NONE) {
+      // Finger may have slid off the original button
+      if (currentBtn == activeButton) {
+        handleButtonHeld(activeButton);
+      }
+    }
+
+    if (touch.justReleased && activeButton != BTN_NONE) {
+      handleButtonRelease(activeButton);
+    }
   }
 
   delay(20);
@@ -160,4 +196,23 @@ void sendCommandForButton(ButtonId btn) {
     case BTN_VOL_DOWN: sendVolumeDown(); break;
     default: break;
   }
+}
+
+// Blank the screen and turn off backlight
+void blankScreen() {
+  digitalWrite(21, LOW);  // Turn off backlight
+  tft.fillScreen(SCREEN_BG);  // Clear screen to black
+  screenAwake = false;
+  Serial.println("Screen blanked");
+}
+
+// Wake up the screen and redraw UI
+void wakeScreen() {
+  digitalWrite(21, HIGH);  // Turn on backlight
+  drawAllButtons();  // Redraw buttons
+  drawConnectionStatus(isWiFiConnected());  // Redraw WiFi status
+  screenAwake = true;
+  firstTouchAfterWake = true;
+  lastTouchTime = millis();  // Reset touch timer
+  Serial.println("Screen woken");
 }
