@@ -1,7 +1,8 @@
 /*******************************************************************
  Volume Control for ESP32 Cheap Yellow Display
- Sends BLE HID media key commands (Volume Up, Mute, Volume Down)
- via Bluetooth Low Energy keyboard emulation.
+ Sends HTTP POST requests to a web server to adjust volume.
+ Set WIFI_SSID, WIFI_PASSWORD, and WEB_SERVER_ADDRESS in
+ common_definitions.h before flashing.
  *******************************************************************/
 
 #include <SPI.h>
@@ -10,7 +11,7 @@
 
 #include "common_definitions.h"
 #include "ui_elements.h"
-#include "hid_utils.h"
+#include "wifi_http.h"
 
 // Hardware setup — XPT2046 touchscreen on VSPI
 #define XPT2046_IRQ  36
@@ -39,7 +40,7 @@ const unsigned long REPEAT_INITIAL_DELAY = 400;  // ms before first repeat
 const unsigned long REPEAT_INTERVAL      = 100;  // ms between subsequent repeats
 
 // State tracking
-ButtonId activeButton       = BTN_NONE;
+ButtonId activeButton        = BTN_NONE;
 unsigned long pressStartTime = 0;
 unsigned long lastRepeatTime = 0;
 bool initialCommandSent      = false;
@@ -66,18 +67,18 @@ void setup() {
   tft.setRotation(1);
   pinMode(21, OUTPUT);
   digitalWrite(21, HIGH);
-  // BLE HID setup
-  initializeHID();
-  Serial.println("BLE HID keyboard starting...");
-  // Draw the three buttons and initial status
+  // Draw buttons and initial status before blocking WiFi connect
   drawAllButtons();
   drawConnectionStatus(false);
+  // WiFi setup
+  initializeWiFi();
+  drawConnectionStatus(isWiFiConnected());
   Serial.println("Volume Control ready!");
 }
 
 void loop() {
-  // Update BLE connection status indicator when state changes
-  bool connected = isHIDConnected();
+  // Update WiFi connection status indicator when state changes
+  bool connected = isWiFiConnected();
   if (connected != wasConnected) {
     wasConnected = connected;
     drawConnectionStatus(connected);
@@ -101,11 +102,11 @@ void loop() {
   delay(20);
 }
 
-// Draw a small BLE status label in the strip below the buttons
+// Draw a small WiFi status label in the strip below the buttons
 void drawConnectionStatus(bool connected) {
   tft.fillRect(0, 226, 320, 14, SCREEN_BG);
   tft.setTextColor(connected ? 0x07E0 : 0xF800, SCREEN_BG);
-  tft.drawCentreString(connected ? "BLE: CONNECTED" : "BLE: WAITING...", 160, 228, 1);
+  tft.drawCentreString(connected ? "WiFi: CONNECTED" : "WiFi: WAITING...", 160, 228, 1);
 }
 
 // Called once on the rising edge of a touch inside a button
@@ -151,7 +152,7 @@ void handleButtonRelease(ButtonId btn) {
   repeatStarted = false;
 }
 
-// Dispatch the appropriate HID command for a button
+// Dispatch the appropriate HTTP command for a button
 void sendCommandForButton(ButtonId btn) {
   switch (btn) {
     case BTN_VOL_UP:   sendVolumeUp();   break;

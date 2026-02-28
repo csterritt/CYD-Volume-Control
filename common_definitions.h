@@ -4,6 +4,17 @@
 #include <TFT_eSPI.h>
 #include <XPT2046_Touchscreen.h>
 
+// WiFi and server configuration — edit these before flashing
+#ifndef WIFI_SSID
+#define WIFI_SSID        "set-ssid-here"
+#endif
+#ifndef WIFI_PASSWORD
+#define WIFI_PASSWORD    "set-password-here"
+#endif
+#ifndef WEB_SERVER_ADDRESS
+#define WEB_SERVER_ADDRESS "server-address-here:3400"
+#endif
+
 // Button colors
 #define BTN_BG       0x441F  // Medium blue (R:66, G:129, B:255)
 #define BTN_FG       0x0000  // Black
