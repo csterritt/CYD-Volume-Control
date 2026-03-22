@@ -22,8 +22,8 @@ void drawWeatherScreen(const WeatherData& w) {
     return;
   }
 
-  // Parse current.time "YYYY-MM-DDThh:mm" into formatted strings
-  const char* tPtr = strchr(w.current.time, 'T');
+  // Parse timestamp "YYYY-MM-DDThh:mm" into formatted strings
+  const char* tPtr = strchr(w.timestamp, 'T');
 
   // Time — convert 24h "HH:MM" to 12h "H:MM", centered, largest (font 8, which only has digits)
   if (tPtr != nullptr) {
@@ -43,17 +43,17 @@ void drawWeatherScreen(const WeatherData& w) {
       "", "January", "February", "March", "April", "May", "June",
       "July", "August", "September", "October", "November", "December"
     };
-    // w.current.time starts with "YYYY-MM-DD"
-    int month = atoi(w.current.time + 5);
-    int day   = atoi(w.current.time + 8);
+    // w.timestamp starts with "YYYY-MM-DD"
+    int month = atoi(w.timestamp + 5);
+    int day   = atoi(w.timestamp + 8);
     char dateBuf[24];
     if (month >= 1 && month <= 12) {
       snprintf(dateBuf, sizeof(dateBuf), "%s %d", MONTH_NAMES[month], day);
     } else {
       // Fallback: raw date slice
-      size_t dateLen = (size_t)(tPtr - w.current.time);
+      size_t dateLen = (size_t)(tPtr - w.timestamp);
       if (dateLen >= sizeof(dateBuf)) dateLen = sizeof(dateBuf) - 1;
-      strncpy(dateBuf, w.current.time, dateLen);
+      strncpy(dateBuf, w.timestamp, dateLen);
       dateBuf[dateLen] = '\0';
     }
     tft.setTextColor(WEATHER_DIM_COLOR, SCREEN_BG);

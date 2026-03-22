@@ -228,7 +228,7 @@ void refreshWeatherDisplay() {
   // Determine hour from parsed timestamp
   int currentHour = -1;
   if (weatherData.valid) {
-    const char* tPtr = strchr(weatherData.current.time, 'T');
+    const char* tPtr = strchr(weatherData.timestamp, 'T');
     if (tPtr != nullptr) {
       currentHour = atoi(tPtr + 1);
     }
