@@ -1,0 +1,20 @@
+#ifndef LOCAL_SETTINGS_H
+#define LOCAL_SETTINGS_H
+
+// WiFi and server configuration — edit these before flashing
+
+// WiFi SSID is case-sensitive
+#ifndef WIFI_SSID
+#define WIFI_SSID        "your-ssid-here"
+#endif
+
+#ifndef WIFI_PASSWORD
+#define WIFI_PASSWORD    "your-password-here"
+#endif
+
+// Web server address is the 'en0' one on my mac
+#ifndef WEB_SERVER_ADDRESS
+#define WEB_SERVER_ADDRESS "your-web-server-address-here"
+#endif
+
+#endif
