@@ -28,13 +28,33 @@ static const char* weatherCodeDescription(int code) {
   return "Unknown";
 }
 
+// Build a two-letter day name + hi/lo entry into buf at pos; returns new pos.
+static int appendDayEntry(char* buf, size_t bufSize, int pos,
+                          const char* dateStr, float hi, float lo) {
+  static const char* const DAY_NAMES[] = { "Su", "Mo", "Tu", "We", "Th", "Fr", "Sa" };
+  static const int t[] = { 0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4 };
+  int y = atoi(dateStr);
+  int m = atoi(dateStr + 5);
+  int day = atoi(dateStr + 8);
+  if (m < 3) y--;
+  int dow = (y + y/4 - y/100 + y/400 + t[m-1] + day) % 7;
+  char entry[20];
+  snprintf(entry, sizeof(entry), "%s %.0f/%.0f  ", DAY_NAMES[dow], hi, lo);
+  size_t entryLen = strlen(entry);
+  if ((size_t)pos + entryLen < bufSize - 1) {
+    strcpy(buf + pos, entry);
+    pos += (int)entryLen;
+  }
+  return pos;
+}
+
 // Draw the weather/clock screen using parsed weather data.
 // Clears the screen and draws (all left-justified):
-//   1. Time        — HH:MM, font 6
-//   2. Date        — Month DD, font 4
-//   3. Temp line   — Temp: XX  Feels like: YY, font 4
-//   4. Cond line   — <condition>  Hum: XX%  Wind YY, font 2
-//   5. Week summary — Mo HH/LL  Tu HH/LL  ..., font 2
+//   1. Time + Date — HH:MM  Month DD, font 6
+//   2. Temp line   — Temp: XX  Feels like: YY, font 4
+//   3. Cond line   — <condition>  Hum: XX%  Wind YY, font 3
+//   4. Week line 1 — first 4 days: Mo HH/LL  Tu HH/LL  ..., font 2
+//   5. Week line 2 — remaining days, font 2
 void drawWeatherScreen(const WeatherData& w) {
   tft.fillScreen(SCREEN_BG);
 
@@ -46,87 +66,82 @@ void drawWeatherScreen(const WeatherData& w) {
 
   const char* tPtr = strchr(w.timestamp, 'T');
 
-  // 1. Time — HH:MM, font 6 (largest that works for mixed text, ~48px tall)
-  if (tPtr != nullptr) {
-    int hour24 = atoi(tPtr + 1);
-    int minute = atoi(tPtr + 4);
-    char timeBuf[16];
-    snprintf(timeBuf, sizeof(timeBuf), "%02d:%02d", hour24, minute);
-    tft.setTextColor(WEATHER_TEXT_COLOR, SCREEN_BG);
-    tft.drawString(timeBuf, WEATHER_LEFT_MARGIN, 4, 6);
-  }
-
-  // 2. Date — Month DD, font 4 (~26px tall), y=56
+  // 1. Time + Date on same line — "HH:MM  Month DD", font 6 (~48px tall), y=4
   if (tPtr != nullptr) {
     static const char* const MONTH_NAMES[] = {
-      "", "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December"
+      "", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
     };
-    int month = atoi(w.timestamp + 5);
-    int day   = atoi(w.timestamp + 8);
-    char dateBuf[24];
-    if (month >= 1 && month <= 12) {
-      snprintf(dateBuf, sizeof(dateBuf), "%s %d", MONTH_NAMES[month], day);
-    } else {
-      size_t dateLen = (size_t)(tPtr - w.timestamp);
-      if (dateLen >= sizeof(dateBuf)) dateLen = sizeof(dateBuf) - 1;
-      strncpy(dateBuf, w.timestamp, dateLen);
-      dateBuf[dateLen] = '\0';
+    int hour24 = atoi(tPtr + 1);
+    int hour12 = hour24 % 12;
+    if (hour12 == 0) {
+      hour12 = 12;
     }
-    tft.setTextColor(WEATHER_DIM_COLOR, SCREEN_BG);
-    tft.drawString(dateBuf, WEATHER_LEFT_MARGIN, 56, 4);
+    int minute  = atoi(tPtr + 4);
+    int month   = atoi(w.timestamp + 5);
+    int day     = atoi(w.timestamp + 8);
+    char timeBuf[40];
+    char dateBuf[40];
+    if (month >= 1 && month <= 12) {
+      snprintf(timeBuf, sizeof(timeBuf), "%2d:%02d",
+               hour12, minute);
+      snprintf(dateBuf, sizeof(dateBuf), "%s %d",
+               MONTH_NAMES[month], day);
+    } else {
+      snprintf(timeBuf, sizeof(timeBuf), "%2d:%02d", hour12, minute);
+    }
+    tft.setTextColor(WEATHER_TEXT_COLOR, SCREEN_BG);
+    tft.drawString(timeBuf, WEATHER_LEFT_MARGIN, 4, 6);
+    tft.drawString(dateBuf, WEATHER_LEFT_MARGIN + 125, 14, 4);
   }
 
-  // 3. Temp line — Temp: XX  Feels like: YY, font 4, y=86
+  // 2. Temp line — Temp: XX  Feels like: YY, font 4 (~26px tall), y=56
   {
     char tempBuf[48];
     snprintf(tempBuf, sizeof(tempBuf), "Temp: %.0f  Feels like: %.0f",
              w.current.temperature_2m,
              w.current.apparent_temperature);
     tft.setTextColor(WEATHER_TEXT_COLOR, SCREEN_BG);
-    tft.drawString(tempBuf, WEATHER_LEFT_MARGIN, 86, 4);
+    tft.drawString(tempBuf, WEATHER_LEFT_MARGIN, 56, 4);
   }
 
-  // 4. Condition + Hum + Wind, font 2 (~16px tall), y=116
+  // 3. Condition + Hum + Wind, font 4 (same as temp), y=86
   {
     char condBuf[64];
-    snprintf(condBuf, sizeof(condBuf), "%s  Hum: %d%%  Wind %.0f",
+    snprintf(condBuf, sizeof(condBuf), "%s  H: %d%%  W: %.0f",
              weatherCodeDescription(w.current.weather_code),
              w.current.relative_humidity_2m,
              w.current.wind_speed_10m);
     tft.setTextColor(WEATHER_DIM_COLOR, SCREEN_BG);
-    tft.drawString(condBuf, WEATHER_LEFT_MARGIN, 116, 2);
+    tft.drawString(condBuf, WEATHER_LEFT_MARGIN, 86, 4);
   }
 
-  // 5. Week summary — two-letter day name + high/low for each day, font 2, y=140
+  // 4+5. Week summary — two lines: 4 days on line 1, rest on line 2, font 2 (~16px), y=116/136
   if (w.daily.count > 0) {
-    static const char* const DAY_NAMES[] = { "Su", "Mo", "Tu", "We", "Th", "Fr", "Sa" };
-    char weekBuf[128];
-    int pos = 0;
-    weekBuf[0] = '\0';
-    for (int d = 0; d < w.daily.count && d < 7; d++) {
-      // w.daily.time[d] is "YYYY-MM-DD"; compute day-of-week via simple Zeller-like formula
-      const char* dateStr = w.daily.time[d];
-      int y = atoi(dateStr);
-      int m = atoi(dateStr + 5);
-      int day = atoi(dateStr + 8);
-      // Tomohiko Sakamoto's algorithm
-      static const int t[] = { 0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4 };
-      if (m < 3) y--;
-      int dow = (y + y/4 - y/100 + y/400 + t[m-1] + day) % 7;
-      char entry[20];
-      snprintf(entry, sizeof(entry), "%s %.0f/%.0f  ",
-               DAY_NAMES[dow],
-               w.daily.temperature_2m_max[d],
-               w.daily.temperature_2m_min[d]);
-      size_t entryLen = strlen(entry);
-      if (pos + entryLen < sizeof(weekBuf) - 1) {
-        strcpy(weekBuf + pos, entry);
-        pos += (int)entryLen;
+    char line1[128];
+    char line2[128];
+    int pos1 = 0, pos2 = 0;
+    line1[0] = '\0';
+    line2[0] = '\0';
+    int total = w.daily.count < 7 ? w.daily.count : 7;
+    for (int d = 0; d < total; d++) {
+      if (d < 4) {
+        pos1 = appendDayEntry(line1, sizeof(line1), pos1,
+                              w.daily.time[d],
+                              w.daily.temperature_2m_max[d],
+                              w.daily.temperature_2m_min[d]);
+      } else {
+        pos2 = appendDayEntry(line2, sizeof(line2), pos2,
+                              w.daily.time[d],
+                              w.daily.temperature_2m_max[d],
+                              w.daily.temperature_2m_min[d]);
       }
     }
     tft.setTextColor(WEATHER_TEXT_COLOR, SCREEN_BG);
-    tft.drawString(weekBuf, WEATHER_LEFT_MARGIN, 140, 2);
+    tft.drawString(line1, WEATHER_LEFT_MARGIN, 116, 2);
+    if (line2[0] != '\0') {
+      tft.drawString(line2, WEATHER_LEFT_MARGIN, 136, 2);
+    }
   }
 
   // Touch hint at the bottom
