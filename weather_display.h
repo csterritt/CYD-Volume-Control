@@ -98,7 +98,7 @@ void drawWeatherScreen(const WeatherData& w) {
   // 2. Temp line — Temp: XX  Feels like: YY, font 4 (~26px tall), y=56
   {
     char tempBuf[48];
-    snprintf(tempBuf, sizeof(tempBuf), "Temp: %.0f  Feels like: %.0f",
+    snprintf(tempBuf, sizeof(tempBuf), "Temp %.0f  Feel %.0f",
              w.current.temperature_2m,
              w.current.apparent_temperature);
     tft.setTextColor(WEATHER_TEXT_COLOR, SCREEN_BG);
