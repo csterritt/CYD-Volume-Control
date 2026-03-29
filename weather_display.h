@@ -65,6 +65,7 @@ void drawWeatherScreen(const WeatherData& w) {
   }
 
   const char* tPtr = strchr(w.timestamp, 'T');
+  int top = 4;
 
   // 1. Time + Date on same line — "HH:MM  Month DD", font 6 (~48px tall), y=4
   if (tPtr != nullptr) {
@@ -82,6 +83,7 @@ void drawWeatherScreen(const WeatherData& w) {
     int day     = atoi(w.timestamp + 8);
     char timeBuf[40];
     char dateBuf[40];
+    char descBuf[40];
     if (month >= 1 && month <= 12) {
       snprintf(timeBuf, sizeof(timeBuf), "%2d:%02d",
                hour12, minute);
@@ -90,63 +92,40 @@ void drawWeatherScreen(const WeatherData& w) {
     } else {
       snprintf(timeBuf, sizeof(timeBuf), "%2d:%02d", hour12, minute);
     }
+    snprintf(descBuf, sizeof(descBuf), "%s", weatherCodeDescription(w.current.weather_code));
     tft.setTextColor(WEATHER_TEXT_COLOR, SCREEN_BG);
-    tft.drawString(timeBuf, WEATHER_LEFT_MARGIN, 4, 6);
-    tft.drawString(dateBuf, WEATHER_LEFT_MARGIN + 125, 14, 4);
+    tft.drawString(timeBuf, WEATHER_LEFT_MARGIN, top, 6);
+    tft.drawString(dateBuf, WEATHER_LEFT_MARGIN + 125, top - 2, 4);
+    tft.drawString(descBuf, WEATHER_LEFT_MARGIN + 125, top + 18, 4);
   }
 
-  // 2. Temp line — Temp: XX  Feels like: YY, font 4 (~26px tall), y=56
+  // 2. Temp/humidity/wind line — Temp XX Feel YY Hum %ZZ Wind WW, font 4 (~26px tall), y=56
   {
-    char tempBuf[48];
-    snprintf(tempBuf, sizeof(tempBuf), "Temp %.0f  Feel %.0f",
+    char tempBuf[64];
+    snprintf(tempBuf, sizeof(tempBuf), "T %.0f F %.0f H %d%% W %.0f",
              w.current.temperature_2m,
-             w.current.apparent_temperature);
-    tft.setTextColor(WEATHER_TEXT_COLOR, SCREEN_BG);
-    tft.drawString(tempBuf, WEATHER_LEFT_MARGIN, 56, 4);
-  }
-
-  // 3. Condition + Hum + Wind, font 4 (same as temp), y=86
-  {
-    char condBuf[64];
-    snprintf(condBuf, sizeof(condBuf), "%s  H: %d%%  W: %.0f",
-             weatherCodeDescription(w.current.weather_code),
+             w.current.apparent_temperature,
              w.current.relative_humidity_2m,
              w.current.wind_speed_10m);
     tft.setTextColor(WEATHER_DIM_COLOR, SCREEN_BG);
-    tft.drawString(condBuf, WEATHER_LEFT_MARGIN, 86, 4);
+    tft.drawString(tempBuf, WEATHER_LEFT_MARGIN, top + 52, 4);
   }
 
-  // 4+5. Week summary — two lines: 4 days on line 1, rest on line 2, font 2 (~16px), y=116/136
+  // 3. Week summary — two lines: 4 days on line 1, rest on line 2, font 2 (~16px), y=116/136
   if (w.daily.count > 0) {
     char line1[128];
-    char line2[128];
-    int pos1 = 0, pos2 = 0;
+    int pos1 = 0;
     line1[0] = '\0';
-    line2[0] = '\0';
-    int total = w.daily.count < 7 ? w.daily.count : 7;
-    for (int d = 0; d < total; d++) {
-      if (d < 4) {
-        pos1 = appendDayEntry(line1, sizeof(line1), pos1,
-                              w.daily.time[d],
-                              w.daily.temperature_2m_max[d],
-                              w.daily.temperature_2m_min[d]);
-      } else {
-        pos2 = appendDayEntry(line2, sizeof(line2), pos2,
-                              w.daily.time[d],
-                              w.daily.temperature_2m_max[d],
-                              w.daily.temperature_2m_min[d]);
-      }
+    int total = w.daily.count < 5 ? w.daily.count : 5;
+    for (int d = 1; d < total; d++) {
+      pos1 = appendDayEntry(line1, sizeof(line1), pos1,
+                            w.daily.time[d],
+                            w.daily.temperature_2m_max[d],
+                            w.daily.temperature_2m_min[d]);
     }
     tft.setTextColor(WEATHER_TEXT_COLOR, SCREEN_BG);
-    tft.drawString(line1, WEATHER_LEFT_MARGIN, 116, 2);
-    if (line2[0] != '\0') {
-      tft.drawString(line2, WEATHER_LEFT_MARGIN, 136, 2);
-    }
+    tft.drawString(line1, WEATHER_LEFT_MARGIN, top + 82, 2);
   }
-
-  // Touch hint at the bottom
-  tft.setTextColor(WEATHER_DIM_COLOR, SCREEN_BG);
-  tft.drawString("Touch to return", WEATHER_LEFT_MARGIN, 225, 1);
 }
 
 #endif
