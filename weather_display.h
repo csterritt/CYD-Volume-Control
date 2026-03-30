@@ -51,6 +51,8 @@ static int appendDayEntry(char* buf, size_t bufSize, int pos,
 // Where to start drawing the weather data
 int top = 68;
 
+int lastLocationChangeMinute = 1;
+
 // Draw the weather/clock screen using parsed weather data.
 // Clears the screen and draws (all left-justified):
 //   1. Time + Date — HH:MM  Month DD, font 6
@@ -81,8 +83,9 @@ void drawWeatherScreen(const WeatherData& w) {
       hour12 = 12;
     }
     int minute  = atoi(tPtr + 4);
-    if (minute % 5 == 0) {
+    if (minute % 5 == 0 && minute != lastLocationChangeMinute) {
       top = random(4, 141);  // Random value between 4 and 140 inclusive
+      lastLocationChangeMinute = minute;
     }
     int month   = atoi(w.timestamp + 5);
     int day     = atoi(w.timestamp + 8);
