@@ -43,12 +43,12 @@ static bool postToServer(const char* path) {
   HTTPClient http;
   char url[128];
   snprintf(url, sizeof(url), "http://%s%s", WEB_SERVER_ADDRESS, path);
-  Serial.printf("POST %s\n", url);
+  // Serial.printf("POST %s\n", url);
 
   http.begin(url);
   http.setTimeout(3000);
   int code = http.POST("");
-  Serial.printf("HTTP response: %d\n", code);
+  // Serial.printf("HTTP response: %d\n", code);
   http.end();
 
   return code >= 200 && code < 300;
@@ -56,17 +56,17 @@ static bool postToServer(const char* path) {
 
 void sendVolumeUp() {
   postToServer("/api/v1/volume-up");
-  Serial.println("VOL_UP");
+  // Serial.println("VOL_UP");
 }
 
 void sendVolumeDown() {
   postToServer("/api/v1/volume-down");
-  Serial.println("VOL_DN");
+  // Serial.println("VOL_DN");
 }
 
 void sendMute() {
   postToServer("/api/v1/mute");
-  Serial.println("MUTE");
+  // Serial.println("MUTE");
 }
 
 // Fetch weather JSON from GET /weather on the configured web server.
@@ -81,12 +81,12 @@ bool fetchWeather(char* buf, size_t bufLen) {
   HTTPClient http;
   char url[128];
   snprintf(url, sizeof(url), "http://%s/weather", WEB_SERVER_ADDRESS);
-  Serial.printf("GET %s\n", url);
+  // Serial.printf("GET %s\n", url);
 
   http.begin(url);
   http.setTimeout(5000);
   int code = http.GET();
-  Serial.printf("fetchWeather HTTP response: %d\n", code);
+  // Serial.printf("fetchWeather HTTP response: %d\n", code);
 
   if (code >= 200 && code < 300) {
     String body = http.getString();

@@ -1,21 +1,33 @@
-# Plan: Random Top Position Every 5 Minutes
+# Plan: OKLCH Color Cycling for Daytime Text
 
 ## Goal
-When the minute extracted from the weather timestamp is divisible by 5 (e.g., :00, :05, :10, etc.), randomly set the `top` vertical position for the weather display between 4 and 140 pixels.
+During hours between 6 AM and 9 PM, cycle text colors through the rainbow using OKLCH color space with constant luminance 0.7 and chroma 0.2. The hue cycles from 0° to 360° based on time of day, changing every 5 minutes.
 
 ## Implementation Steps
 
-1. **Add random include** - Add `#include <stdlib.h>` or Arduino's random function
-2. **Modify drawWeatherScreen()** - After extracting `minute` on line 83, check if `minute % 5 == 0`
-3. **Randomize top** - If condition met, set `top = random(4, 141)` (Arduino's random is exclusive of upper bound)
-4. **Update global top** - The `top` variable is already a global at line 52, so modifications persist
+1. **Add OKLCH to RGB conversion functions**
+   - Convert OKLCH → Oklab (L, C, h → L, a, b)
+   - Convert Oklab → linear RGB
+   - Apply gamma correction (linear → sRGB)
+   - Convert sRGB to 16-bit RGB565 for TFT
+
+2. **Add time-based hue calculation**
+   - Calculate minutes since 6 AM (0 to 899)
+   - Map to hue: (minutes / 5) * 2 degrees % 360
+   - 15 hours = 180 5-minute intervals = 360° cycle
+
+3. **Apply cycling color to text**
+   - During 6 AM - 9 PM: use calculated color for text
+   - Outside hours: use original colors (white/gray)
+   - Background stays black
 
 ## Pitfalls
 
-- Arduino's `random(min, max)` is exclusive of max, so use 141 to include 140
-- Ensure `randomSeed()` is called elsewhere in the app to avoid repeatable patterns
-- The `top` value affects all text positioning; very low/high values may cause overlap or clipping
-- No existing tests, so manual verification will be needed
+- OKLCH→RGB conversion requires math functions (sin, cos, pow) - may impact performance
+- Gamma correction needed for perceptually accurate colors
+- Must handle time boundary at midnight correctly
+- TFT uses RGB565 format (5R-6G-5B), not RGB888
+- Math operations on ESP32 are slower; consider lookup table if needed
 
 ## Files to Modify
-- `/Users/chris/hacks/esp32/CYD-Volume-Control/weather_display.h` - Add modulo check and random assignment
+- `/Users/chris/hacks/esp32/CYD-Volume-Control/weather_display.h` - Add conversion functions and color calculation
