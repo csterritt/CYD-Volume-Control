@@ -48,10 +48,26 @@ static int appendDayEntry(char* buf, size_t bufSize, int pos,
   return pos;
 }
 
+int abs(int x) {
+  return x < 0 ? -x : x;
+}
+
+// Minimum delta between last and new top position
+const int minDelta = 25;
+
 // Where to start drawing the weather data
 int top = 68;
 
+// Last minute when top was changed
 int lastLocationChangeMinute = 1;
+
+int distantRandom(int min, int max) {
+  int result;
+  do {
+    result = random(min, max + 1);  // Random value between min and max inclusive
+  } while (abs(result - top) < minDelta);
+  return result;
+}
 
 // Draw the weather/clock screen using parsed weather data.
 // Clears the screen and draws (all left-justified):
@@ -74,8 +90,8 @@ void drawWeatherScreen(const WeatherData& w) {
   // 1. Time + Date on same line — "HH:MM  Month DD", font 6 (~48px tall), y=4
   if (tPtr != nullptr) {
     static const char* const MONTH_NAMES[] = {
-      "", "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+      "", "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
     };
     int hour24 = atoi(tPtr + 1);
     int hour12 = hour24 % 12;
@@ -84,7 +100,7 @@ void drawWeatherScreen(const WeatherData& w) {
     }
     int minute  = atoi(tPtr + 4);
     if (minute % 5 == 0 && minute != lastLocationChangeMinute) {
-      top = random(4, 141);  // Random value between 4 and 140 inclusive
+      top = distantRandom(4, 140);  // Random value between 4 and 140 inclusive
       lastLocationChangeMinute = minute;
     }
     int month   = atoi(w.timestamp + 5);
