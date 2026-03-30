@@ -1,38 +1,21 @@
-# Weather Display Rearrangement Plan
+# Plan: Random Top Position Every 5 Minutes
 
 ## Goal
-Rearrange `weather_display.h` so all content is left-justified and laid out as:
+When the minute extracted from the weather timestamp is divisible by 5 (e.g., :00, :05, :10, etc.), randomly set the `top` vertical position for the weather display between 4 and 140 pixels.
 
-1. **Time** — HH:MM (24h), font 6, left edge, top of screen
-2. **Date** — Month DD, font 4 (next smaller), below time
-3. **Temp + Feels like** — `Temp: XX  Feels like: YY`, font 4, below date
-4. **Condition + Hum + Wind** — `<condition>  Hum: XX%  Wind YY`, font 2, below temp
-5. **Week summary** — all 7 days on one line: `Mo 72/55  Tu 68/50  ...`, font 2, below condition
+## Implementation Steps
 
-## Screen dimensions
-320 × 240 (landscape). Left margin: 4 px.
+1. **Add random include** - Add `#include <stdlib.h>` or Arduino's random function
+2. **Modify drawWeatherScreen()** - After extracting `minute` on line 83, check if `minute % 5 == 0`
+3. **Randomize top** - If condition met, set `top = random(4, 141)` (Arduino's random is exclusive of upper bound)
+4. **Update global top** - The `top` variable is already a global at line 52, so modifications persist
 
-## Font sizes (TFT_eSPI built-in)
-- Font 6: large digits/text (~52px tall) — used for time
-- Font 4: medium (~26px tall) — used for date and temp line
-- Font 2: small (~16px tall) — used for condition/hum/wind and week summary
+## Pitfalls
 
-## Y positions (approximate, leaving 4px gaps)
-| Row | Font | Approx Y |
-|-----|------|----------|
-| Time | 6 | 4 |
-| Date | 4 | 60 |
-| Temp/Feels | 4 | 90 |
-| Condition/Hum/Wind | 2 | 120 |
-| Week summary | 2 | 140 |
-| Touch hint | 1 | 225 |
+- Arduino's `random(min, max)` is exclusive of max, so use 141 to include 140
+- Ensure `randomSeed()` is called elsewhere in the app to avoid repeatable patterns
+- The `top` value affects all text positioning; very low/high values may cause overlap or clipping
+- No existing tests, so manual verification will be needed
 
-## Weather condition mapping
-Map `weather_code` to a short description string (WMO codes).
-
-## Changes
-- `weather_display.h`: full rewrite of `drawWeatherScreen()`
-- No changes to `weather_data.h`, `CYD-Volume-Control.ino`, or any other file
-
-## Tests
-See `Notes/3-Plan-Tests.md` for the full manual on-device test plan.
+## Files to Modify
+- `/Users/chris/hacks/esp32/CYD-Volume-Control/weather_display.h` - Add modulo check and random assignment

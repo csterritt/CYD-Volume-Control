@@ -1,24 +1,23 @@
-Plan tests, and modifications to existing tests as needed.
+# Test Planning
 
-## Manual On-Device Tests
+## No Existing Tests
+This project currently has no automated test infrastructure.
 
-These are manual tests since the CYD has no test framework; verify by observation after flashing.
+## Tests Needed for This Change
 
-| # | Test | Steps | Expected Result |
-|---|------|-------|----------------|
-| 1 | Boot — volume UI visible | Power on device | Backlight on, three buttons (V+, M, V-) visible, WiFi status at bottom |
-| 2 | Timeout → weather screen | Boot, wait 30 seconds without touching | Screen switches to weather display; timestamp shown in red top-left |
-| 3 | Weather data displayed | As above, with server reachable | Current temp, feels-like, humidity, wind, today H/L all visible |
-| 4 | No server → graceful fallback | Boot with server unreachable, wait 30s | Weather screen shows "No weather data" (no crash) |
-| 5 | Touch returns to volume UI | While on weather screen, tap anywhere | Immediately returns to volume button UI |
-| 6 | Timer resets on touch | Touch volume UI at 25s, then wait 30s | Timeout clock restarts from the touch; weather screen appears 30s after that touch |
-| 7 | Volume Up sends POST | Press V+ button | HTTP POST to `/api/v1/volume-up`; button visually inverts |
-| 8 | Volume Up repeat-hold | Press and hold V+ for >400ms | Repeated POSTs every 100ms while held |
-| 9 | Mute fires once | Press and hold M | Single POST to `/api/v1/mute`; no repeat |
-| 10 | Volume Down sends POST | Press V- button | HTTP POST to `/api/v1/volume-down` |
-| 11 | WiFi disconnect recovery | Disconnect WiFi AP, press volume button | Serial logs "WiFi not connected, skipping POST"; no crash |
-| 12 | Weather screen → volume → weather cycle | Cycle through the two modes multiple times | No flickering, no stale state, each mode redraws cleanly |
+1. **Unit test for modulo condition**
+   - Verify `minute % 5 == 0` correctly triggers at minutes 0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55
+   - Verify it does NOT trigger at other minute values
 
-## Existing Behavior — No Regression
+2. **Unit test for random range**
+   - Mock `random()` calls to verify range is 4 to 141 (exclusive upper bound for Arduino)
+   - Verify `top` is set within bounds [4, 140]
 
-The volume button logic (press, hold-repeat, release) is unchanged from before. Tests 7–10 above cover regression on that path.
+3. **Integration test**
+   - Verify display positioning is correct with various `top` values (edge cases at 4 and 140)
+   - Screen height is likely 240px, so 140 leaves room for text elements
+
+## Test Infrastructure to Add (if desired)
+- PlatformIO test framework or Arduino-Unit for ESP32
+- Mock `random()` and `tft` objects for isolated testing
+- CI pipeline to run tests on push

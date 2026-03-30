@@ -81,6 +81,10 @@ void sendCommandForButton(ButtonId btn);
 
 void setup() {
   Serial.begin(115200);
+
+  // Initialize random seed
+  randomSeed(analogRead(0));
+  
   // Touch setup
   mySpi.begin(XPT2046_CLK, XPT2046_MISO, XPT2046_MOSI, XPT2046_CS);
   ts.begin(mySpi);
