@@ -72,8 +72,8 @@ int distantRandom(int min, int max) {
 }
 
 // OKLCH constants
-const float OKLCH_L = 0.7f;   // Luminance
-const float OKLCH_C = 0.2f;   // Chroma
+const float OKLCH_L = 0.4f;     // Luminance
+const float OKLCH_C = 0.6f;     // Chroma
 const int DAY_START_HOUR = 6;   // 6 AM
 const int DAY_END_HOUR = 21;    // 9 PM (21:00)
 const int DAY_MINUTES = 900;    // 15 hours * 60 minutes
@@ -120,12 +120,16 @@ uint16_t oklchToRgb565(float L, float C, float hDegrees) {
   g = fmaxf(0.0f, fminf(1.0f, g));
   bVal = fmaxf(0.0f, fminf(1.0f, bVal));
 
+  Serial.printf("r: %0.2f, g: %0.2f, b: %0.2f\n", r, g, bVal);
+
   // Convert to RGB565: 5 bits R, 6 bits G, 5 bits B
   uint8_t r5 = (uint8_t)(r * 31.0f + 0.5f);  // 0-31
   uint8_t g6 = (uint8_t)(g * 63.0f + 0.5f);  // 0-63
   uint8_t b5 = (uint8_t)(bVal * 31.0f + 0.5f);  // 0-31
 
-  return (r5 << 11) | (g6 << 5) | b5;
+  Serial.printf("r: %d, g: %d, b: %d\n", r5, g6, b5);
+
+  return tft.color565((int)roundf(r*255), (int)roundf(g*255), (int)roundf(bVal*255)); // (r5 << 11) | (g6 << 5) | b5;
 }
 
 // Calculate hue based on time of day (6 AM to 9 PM)
@@ -195,8 +199,7 @@ void drawWeatherScreen(const WeatherData& w) {
     } else {
       textColor = WEATHER_TEXT_COLOR;  // White outside daytime
     }
-    Serial.print("textColor is ");
-    Serial.println(textColor);
+    Serial.printf("textColor is 0x%04X\n", textColor);
     int month   = atoi(w.timestamp + 5);
     int day     = atoi(w.timestamp + 8);
     char timeBuf[40];
