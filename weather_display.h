@@ -9,6 +9,7 @@
 #define WEATHER_TIMESTAMP_COLOR 0xF800  // Red
 #define WEATHER_TEXT_COLOR      0xFFFF  // White
 #define WEATHER_DIM_COLOR       0x8410  // Gray
+#define NIGHT_TEXT_COLOR        0xF800  // Red for night mode
 
 #define WEATHER_LEFT_MARGIN 4
 
@@ -133,9 +134,15 @@ uint16_t oklchToRgb565(float L, float C, float hDegrees) {
 }
 
 // Calculate hue based on time of day (6 AM to 9 PM)
+// Returns true if hour (0-23) falls in the night blackout window (22:00 – 05:59)
+bool isNightHour(int hour) {
+  return hour >= 22 || hour < 6;
+}
+
+// Calculate hue based on time of day (6 AM to 9 PM)
 // Returns hue in degrees (0-360), or -1 if outside daytime hours
 float calculateDaytimeHue(int hour24, int minute) {
-  if (hour24 < DAY_START_HOUR || hour24 >= DAY_END_HOUR) {
+  if (isNightHour(hour24)) {
     return -1;  // Outside daytime hours
   }
 
@@ -194,7 +201,9 @@ void drawWeatherScreen(const WeatherData& w) {
     float hue = calculateDaytimeHue(hour24, minute);
     Serial.print("hue is ");
     Serial.println(hue);
-    if (hue >= 0) {
+    if (isNightHour(hour24)) {
+      textColor = NIGHT_TEXT_COLOR;  // Red at night
+    } else if (hue >= 0) {
       textColor = oklchToRgb565(OKLCH_L, OKLCH_C, hue);
     } else {
       textColor = WEATHER_TEXT_COLOR;  // White outside daytime

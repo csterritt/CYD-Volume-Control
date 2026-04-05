@@ -48,13 +48,23 @@ enum ScreenMode {
   MODE_WEATHER
 };
 
+// Night mode state
+enum NightModeState {
+  NIGHT_OFF,
+  NIGHT_WEATHER,
+  NIGHT_VOLUME
+};
+
 // Screen power management / mode switching
 const unsigned long SCREEN_TIMEOUT = 30000;     // 30 seconds
 const unsigned long WEATHER_REFRESH_INTERVAL = 30000;  // 30 seconds
+const unsigned long NIGHT_TIMEOUT = 15000;      // 15 seconds for night mode
 unsigned long lastTouchTime = 0;
 unsigned long lastWeatherRefresh = 0;
+unsigned long nightModeLastTouchTime = 0;
 bool displayOn = true;
 ScreenMode screenMode = MODE_VOLUME;
+NightModeState nightModeState = NIGHT_OFF;
 
 // Weather data
 static const size_t WEATHER_BUF_SIZE = 2048;
@@ -106,6 +116,64 @@ void setup() {
 }
 
 void loop() {
+  // Get current hour for night mode detection
+  int currentHour = -1;
+  if (weatherData.valid) {
+    const char* tPtr = strchr(weatherData.timestamp, 'T');
+    if (tPtr != nullptr) {
+      currentHour = atoi(tPtr + 1);
+    }
+  }
+
+  // Night mode state machine
+  bool isNight = (currentHour >= 0 && isNightHour(currentHour));
+
+  if (!isNight) {
+    // Daytime: ensure backlight is on and reset night mode state
+    if (!displayOn) {
+      digitalWrite(21, HIGH);
+      displayOn = true;
+    }
+    if (nightModeState != NIGHT_OFF) {
+      nightModeState = NIGHT_OFF;
+    }
+  } else {
+    // Night mode: handle state machine
+    // Handle 15-second timeout
+    if ((nightModeState == NIGHT_WEATHER || nightModeState == NIGHT_VOLUME) &&
+        (millis() - nightModeLastTouchTime > NIGHT_TIMEOUT)) {
+      nightModeState = NIGHT_OFF;
+      digitalWrite(21, LOW);
+      displayOn = false;
+      Serial.println("Night mode timeout: backlight off");
+    }
+
+    // Handle touch transitions
+    if (touch.justPressed) {
+      nightModeLastTouchTime = millis();
+      if (nightModeState == NIGHT_OFF) {
+        nightModeState = NIGHT_WEATHER;
+        digitalWrite(21, HIGH);
+        displayOn = true;
+        switchToWeatherMode();
+        return;
+      } else if (nightModeState == NIGHT_WEATHER) {
+        nightModeState = NIGHT_VOLUME;
+        switchToVolumeMode();
+        return;
+      } else if (nightModeState == NIGHT_VOLUME) {
+        // Stay in volume mode, just update touch time
+      }
+    }
+
+    // If in NIGHT_OFF state, skip rest of loop
+    if (nightModeState == NIGHT_OFF) {
+      updateTouch();
+      delay(20);
+      return;
+    }
+  }
+
   // Update WiFi connection status indicator when state changes (volume mode only)
   if (screenMode == MODE_VOLUME) {
     bool connected = isWiFiConnected();
@@ -217,11 +285,6 @@ void sendCommandForButton(ButtonId btn) {
   }
 }
 
-// Returns true if hour (0-23) falls in the night blackout window (22:00 – 05:59)
-static bool isNightHour(int hour) {
-  return hour >= 22 || hour < 6;
-}
-
 // Fetch weather, apply night-mode logic, and draw
 void refreshWeatherDisplay() {
   lastWeatherRefresh = millis();
@@ -238,13 +301,19 @@ void refreshWeatherDisplay() {
     }
   }
   if (currentHour >= 0 && isNightHour(currentHour)) {
-    if (displayOn) {
+    // At night: only turn off backlight if in NIGHT_OFF state
+    if (nightModeState == NIGHT_OFF && displayOn) {
       tft.fillScreen(TFT_BLACK);
       digitalWrite(21, LOW);   // backlight off
       displayOn = false;
       Serial.println("Night mode: display off");
+    } else if (nightModeState == NIGHT_WEATHER) {
+      // Show weather with red text
+      drawWeatherScreen(weatherData);
     }
+    // In NIGHT_VOLUME state, don't draw weather (volume mode handles it)
   } else {
+    // Daytime: ensure backlight is on and draw weather
     if (!displayOn) {
       digitalWrite(21, HIGH);  // backlight on
       displayOn = true;
@@ -259,6 +328,19 @@ void switchToWeatherMode() {
   screenMode = MODE_WEATHER;
   Serial.println("Switching to weather mode");
   refreshWeatherDisplay();
+
+  // Update night mode state if at night
+  int currentHour = -1;
+  if (weatherData.valid) {
+    const char* tPtr = strchr(weatherData.timestamp, 'T');
+    if (tPtr != nullptr) {
+      currentHour = atoi(tPtr + 1);
+    }
+  }
+  if (currentHour >= 0 && isNightHour(currentHour)) {
+    nightModeState = NIGHT_WEATHER;
+    nightModeLastTouchTime = millis();
+  }
 }
 
 // Switch back to volume control mode
@@ -271,4 +353,17 @@ void switchToVolumeMode() {
   drawAllButtons();
   drawConnectionStatus(isWiFiConnected());
   Serial.println("Switching to volume mode");
+
+  // Update night mode state if at night
+  int currentHour = -1;
+  if (weatherData.valid) {
+    const char* tPtr = strchr(weatherData.timestamp, 'T');
+    if (tPtr != nullptr) {
+      currentHour = atoi(tPtr + 1);
+    }
+  }
+  if (currentHour >= 0 && isNightHour(currentHour)) {
+    nightModeState = NIGHT_VOLUME;
+    nightModeLastTouchTime = millis();
+  }
 }
