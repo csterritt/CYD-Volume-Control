@@ -172,9 +172,13 @@ void loop() {
       }
     }
 
-    // If in NIGHT_OFF state, skip rest of loop
+    // If in NIGHT_OFF state, skip rest of loop but still refresh weather periodically
     if (nightModeState == NIGHT_OFF) {
       updateTouch();
+      // Periodic weather refresh to detect time changes (e.g., 6am transition)
+      if (millis() - lastWeatherRefresh >= WEATHER_REFRESH_INTERVAL) {
+        refreshWeatherDisplay();
+      }
       delay(20);
       return;
     }
