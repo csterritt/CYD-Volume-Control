@@ -145,6 +145,7 @@ void loop() {
     if ((nightModeState == NIGHT_WEATHER || nightModeState == NIGHT_VOLUME) &&
         (millis() - nightModeLastTouchTime > NIGHT_TIMEOUT)) {
       nightModeState = NIGHT_OFF;
+      tft.fillScreen(SCREEN_BG);
       digitalWrite(21, LOW);
       displayOn = false;
       Serial.println("Night mode timeout: backlight off");
@@ -308,7 +309,7 @@ void refreshWeatherDisplay() {
   if (currentHour >= 0 && isNightHour(currentHour)) {
     // At night: only turn off backlight if in NIGHT_OFF state
     if (nightModeState == NIGHT_OFF && displayOn) {
-      tft.fillScreen(TFT_BLACK);
+      tft.fillScreen(SCREEN_BG);
       digitalWrite(21, LOW);   // backlight off
       displayOn = false;
       Serial.println("Night mode: display off");
