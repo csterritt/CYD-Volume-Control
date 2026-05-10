@@ -59,9 +59,11 @@ enum NightModeState {
 const unsigned long SCREEN_TIMEOUT = 30000;     // 30 seconds
 const unsigned long WEATHER_REFRESH_INTERVAL = 30000;  // 30 seconds
 const unsigned long NIGHT_TIMEOUT = 15000;      // 15 seconds for night mode
+const unsigned long NIGHT_MODE_DEBOUNCE = 500;  // 500ms debounce after night mode transition
 unsigned long lastTouchTime = 0;
 unsigned long lastWeatherRefresh = 0;
 unsigned long nightModeLastTouchTime = 0;
+unsigned long lastNightModeTransition = 0;
 bool displayOn = true;
 ScreenMode screenMode = MODE_VOLUME;
 NightModeState nightModeState = NIGHT_OFF;
@@ -149,20 +151,23 @@ void loop() {
     }
 
     // Handle touch transitions
-    if (touch.justPressed) {
+    if (touch.justPressed && (millis() - lastNightModeTransition > NIGHT_MODE_DEBOUNCE)) {
       nightModeLastTouchTime = millis();
       if (nightModeState == NIGHT_OFF) {
         nightModeState = NIGHT_WEATHER;
+        lastNightModeTransition = millis();
         digitalWrite(21, HIGH);
         displayOn = true;
         switchToWeatherMode();
         return;
       } else if (nightModeState == NIGHT_WEATHER) {
         nightModeState = NIGHT_VOLUME;
+        lastNightModeTransition = millis();
         switchToVolumeMode();
         return;
       } else if (nightModeState == NIGHT_VOLUME) {
         // Stay in volume mode, just update touch time
+        lastNightModeTransition = millis();
       }
     }
 
