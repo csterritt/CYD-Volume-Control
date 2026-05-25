@@ -6,6 +6,36 @@
 
 #include "common_definitions.h"
 
+// Cached resolved IP address for the web server
+static IPAddress resolvedServerIP;
+static bool isIPResolved = false;
+
+// Resolve WEB_SERVER_ADDRESS to an IP address if it's a hostname.
+// Returns the IP address (either resolved or from cache).
+static IPAddress getServerIP() {
+  if (isIPResolved) {
+    return resolvedServerIP;
+  }
+
+  // Try to parse as IP address first
+  if (resolvedServerIP.fromString(WEB_SERVER_ADDRESS)) {
+    isIPResolved = true;
+    Serial.printf("Using IP address: %s\n", WEB_SERVER_ADDRESS);
+    return resolvedServerIP;
+  }
+
+  // If not an IP, perform DNS lookup
+  Serial.printf("Resolving hostname: %s\n", WEB_SERVER_ADDRESS);
+  if (WiFi.hostByName(WEB_SERVER_ADDRESS, resolvedServerIP)) {
+    isIPResolved = true;
+    Serial.printf("Resolved to IP: %s\n", resolvedServerIP.toString().c_str());
+  } else {
+    Serial.println("DNS lookup failed");
+  }
+
+  return resolvedServerIP;
+}
+
 // Initialize WiFi — call in setup(). Blocks until connected or times out.
 void initializeWiFi() {
   Serial.printf("WiFi connecting to %s\n", WIFI_SSID);
@@ -40,9 +70,15 @@ static bool postToServer(const char* path) {
     return false;
   }
 
+  IPAddress serverIP = getServerIP();
+  if (serverIP == INADDR_NONE) {
+    Serial.println("Cannot resolve server address");
+    return false;
+  }
+
   HTTPClient http;
   char url[128];
-  snprintf(url, sizeof(url), "http://%s%s", WEB_SERVER_ADDRESS, path);
+  snprintf(url, sizeof(url), "http://%s:%s%s", serverIP.toString().c_str(), WEB_SERVER_PORT, path);
   // Serial.printf("POST %s\n", url);
 
   http.begin(url);
@@ -78,9 +114,15 @@ bool fetchWeather(char* buf, size_t bufLen) {
     return false;
   }
 
+  IPAddress serverIP = getServerIP();
+  if (serverIP == INADDR_NONE) {
+    Serial.println("Cannot resolve server address");
+    return false;
+  }
+
   HTTPClient http;
   char url[128];
-  snprintf(url, sizeof(url), "http://%s/weather", WEB_SERVER_ADDRESS);
+  snprintf(url, sizeof(url), "http://%s:%s/weather", serverIP.toString().c_str(), WEB_SERVER_PORT);
   // Serial.printf("GET %s\n", url);
 
   http.begin(url);

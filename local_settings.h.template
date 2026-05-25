@@ -12,9 +12,14 @@
 #define WIFI_PASSWORD    "your-password-here"
 #endif
 
-// Web server address is the 'en0' one on my mac
+// Web server address (hostname, or the IP address of your computer ('en0' on Mac))
 #ifndef WEB_SERVER_ADDRESS
 #define WEB_SERVER_ADDRESS "your-web-server-address-here"
+#endif
+
+// Web server port - note, must be a string
+#ifndef WEB_SERVER_PORT
+#define WEB_SERVER_PORT "3400"
 #endif
 
 #endif
