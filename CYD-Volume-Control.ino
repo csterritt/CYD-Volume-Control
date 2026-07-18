@@ -90,6 +90,7 @@ void handleButtonPress(ButtonId btn);
 void handleButtonHeld(ButtonId btn);
 void handleButtonRelease(ButtonId btn);
 void sendCommandForButton(ButtonId btn);
+void maintainWiFiConnection();
 
 void setup() {
   Serial.begin(115200);
@@ -118,6 +119,9 @@ void setup() {
 }
 
 void loop() {
+  // Keep WiFi alive — reconnects automatically every 30s if disconnected
+  maintainWiFiConnection();
+
   // Get current hour for night mode detection
   int currentHour = -1;
   if (weatherData.valid) {

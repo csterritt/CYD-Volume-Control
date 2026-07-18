@@ -10,6 +10,10 @@
 static IPAddress resolvedServerIP;
 static bool isIPResolved = false;
 
+// WiFi reconnection tracking
+static unsigned long lastReconnectAttempt = 0;
+const unsigned long WIFI_RECONNECT_INTERVAL = 30000;  // 30 seconds
+
 // Resolve WEB_SERVER_ADDRESS to an IP address if it's a hostname.
 // Returns the IP address (either resolved or from cache).
 static IPAddress getServerIP() {
@@ -62,12 +66,50 @@ bool isWiFiConnected() {
   return WiFi.status() == WL_CONNECTED;
 }
 
+// Attempt to reconnect WiFi if disconnected. Call from loop().
+// Tries every WIFI_RECONNECT_INTERVAL (30 s) until it succeeds.
+void maintainWiFiConnection() {
+  if (isWiFiConnected()) {
+    return;
+  }
+
+  unsigned long now = millis();
+  if (now - lastReconnectAttempt < WIFI_RECONNECT_INTERVAL) {
+    return;
+  }
+
+  lastReconnectAttempt = now;
+  Serial.println("WiFi disconnected — attempting reconnect...");
+  WiFi.disconnect();
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  // Wait up to 10 seconds for this attempt
+  unsigned long start = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - start < 10000) {
+    delay(250);
+    Serial.print(".");
+  }
+  Serial.println();
+
+  if (isWiFiConnected()) {
+    Serial.printf("WiFi reconnected, IP: %s\n", WiFi.localIP().toString().c_str());
+    // Clear DNS cache — server IP may have changed
+    isIPResolved = false;
+    resolvedServerIP = INADDR_NONE;
+  } else {
+    Serial.println("WiFi reconnect failed — will retry in 30 seconds");
+  }
+}
+
 // Send an HTTP POST to the given path on the configured web server.
 // Returns true on HTTP 2xx response.
 static bool postToServer(const char* path) {
   if (!isWiFiConnected()) {
-    Serial.printf("WiFi not connected, skipping POST %s\n", path);
-    return false;
+    maintainWiFiConnection();
+    if (!isWiFiConnected()) {
+      Serial.printf("WiFi not connected, skipping POST %s\n", path);
+      return false;
+    }
   }
 
   IPAddress serverIP = getServerIP();
@@ -110,8 +152,11 @@ void sendMute() {
 // Returns true on HTTP 2xx response.
 bool fetchWeather(char* buf, size_t bufLen) {
   if (!isWiFiConnected()) {
-    Serial.println("fetchWeather: WiFi not connected");
-    return false;
+    maintainWiFiConnection();
+    if (!isWiFiConnected()) {
+      Serial.println("fetchWeather: WiFi not connected");
+      return false;
+    }
   }
 
   IPAddress serverIP = getServerIP();
