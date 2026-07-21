@@ -73,6 +73,10 @@ static const size_t WEATHER_BUF_SIZE = 2048;
 static char weatherBuf[WEATHER_BUF_SIZE];
 WeatherData weatherData;
 
+// Weather reconnection tracking
+static unsigned long lastWeatherRetry = 0;
+const unsigned long WEATHER_RETRY_INTERVAL = 30000;  // 30 seconds
+
 // State tracking
 ButtonId activeButton        = BTN_NONE;
 unsigned long pressStartTime = 0;
@@ -91,6 +95,7 @@ void handleButtonHeld(ButtonId btn);
 void handleButtonRelease(ButtonId btn);
 void sendCommandForButton(ButtonId btn);
 void maintainWiFiConnection();
+void maintainWeatherConnection();
 
 void setup() {
   Serial.begin(115200);
@@ -121,6 +126,9 @@ void setup() {
 void loop() {
   // Keep WiFi alive — reconnects automatically every 30s if disconnected
   maintainWiFiConnection();
+
+  // Keep weather data alive — refetches automatically every 30s if invalid
+  maintainWeatherConnection();
 
   // Get current hour for night mode detection
   int currentHour = -1;
@@ -302,7 +310,6 @@ void sendCommandForButton(ButtonId btn) {
 // Fetch weather, apply night-mode logic, and draw
 void refreshWeatherDisplay() {
   lastWeatherRefresh = millis();
-  memset(&weatherData, 0, sizeof(weatherData));
   if (fetchWeather(weatherBuf, WEATHER_BUF_SIZE)) {
     parseWeatherJson(weatherBuf, weatherData);
   }
@@ -334,6 +341,31 @@ void refreshWeatherDisplay() {
       Serial.println("Day mode: display on");
     }
     drawWeatherScreen(weatherData);
+  }
+}
+
+// Attempt to refetch weather if data is invalid. Call from loop().
+// Tries every WEATHER_RETRY_INTERVAL (30 s) until it succeeds.
+void maintainWeatherConnection() {
+  if (weatherData.valid) {
+    return;
+  }
+
+  unsigned long now = millis();
+  if (now - lastWeatherRetry < WEATHER_RETRY_INTERVAL) {
+    return;
+  }
+
+  lastWeatherRetry = now;
+  Serial.println("Weather data invalid — attempting refetch...");
+  if (fetchWeather(weatherBuf, WEATHER_BUF_SIZE)) {
+    parseWeatherJson(weatherBuf, weatherData);
+  }
+
+  if (weatherData.valid) {
+    Serial.println("Weather data refetched successfully");
+  } else {
+    Serial.println("Weather refetch failed — will retry in 30 seconds");
   }
 }
 
