@@ -255,7 +255,12 @@ void loop() {
 void drawConnectionStatus(bool connected) {
   tft.fillRect(0, 226, 320, 14, SCREEN_BG);
   tft.setTextColor(connected ? 0x07E0 : 0xF800, SCREEN_BG);
-  tft.drawCentreString(connected ? "WiFi: CONNECTED" : "WiFi: WAITING...", 160, 228, 1);
+  char ipBuf[24];
+  getServerIPString(ipBuf, sizeof(ipBuf));
+  char statusBuf[64];
+  snprintf(statusBuf, sizeof(statusBuf), "%s  %s",
+           connected ? "WiFi: CONNECTED" : "WiFi: WAITING...", ipBuf);
+  tft.drawCentreString(statusBuf, 160, 228, 1);
 }
 
 // Called once on the rising edge of a touch inside a button

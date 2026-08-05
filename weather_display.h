@@ -9,6 +9,7 @@
 
 #include "common_definitions.h"
 #include "weather_data.h"
+#include "wifi_http.h"
 
 #define WEATHER_TIMESTAMP_COLOR 0xF800  // Red
 #define WEATHER_TEXT_COLOR      0xFFFF  // White
@@ -178,6 +179,11 @@ void drawWeatherScreen(const WeatherData& w) {
   if (!w.valid) {
     tft.setTextColor(WEATHER_TIMESTAMP_COLOR, SCREEN_BG);
     tft.drawString("No weather data", WEATHER_LEFT_MARGIN, 110, 2);
+    char ipBuf[24];
+    getServerIPString(ipBuf, sizeof(ipBuf));
+    char errBuf[40];
+    snprintf(errBuf, sizeof(errBuf), "%s (%u)", ipBuf, getWeatherFetchCount());
+    tft.drawString(errBuf, WEATHER_LEFT_MARGIN, 130, 2);
     return;
   }
 

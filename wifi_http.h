@@ -14,6 +14,9 @@
 static IPAddress resolvedServerIP;
 static bool isIPResolved = false;
 
+// Number of times fetchWeather() has been called since boot
+static unsigned int weatherFetchCount = 0;
+
 // WiFi reconnection tracking
 static unsigned long lastReconnectAttempt = 0;
 const unsigned long WIFI_RECONNECT_INTERVAL = 30000;  // 30 seconds
@@ -42,6 +45,23 @@ static IPAddress getServerIP() {
   }
 
   return resolvedServerIP;
+}
+
+// Return a human-readable string for the resolved server IP address,
+// or "No IP address" if it hasn't been resolved (or DNS failed) yet.
+// Writes into buf and returns buf for convenience.
+const char* getServerIPString(char* buf, size_t len) {
+  if (isIPResolved && resolvedServerIP != INADDR_NONE) {
+    snprintf(buf, len, "%s", resolvedServerIP.toString().c_str());
+  } else {
+    snprintf(buf, len, "No IP address");
+  }
+  return buf;
+}
+
+// Return the number of times fetchWeather() has been called since boot.
+unsigned int getWeatherFetchCount() {
+  return weatherFetchCount;
 }
 
 // Initialize WiFi — call in setup(). Blocks until connected or times out.
@@ -111,26 +131,30 @@ static bool postToServer(const char* path) {
   if (!isWiFiConnected()) {
     maintainWiFiConnection();
     if (!isWiFiConnected()) {
-      Serial.printf("WiFi not connected, skipping POST %s\n", path);
+      Serial.printf("postToServer: WiFi not connected, skipping POST %s\n", path);
       return false;
     }
   }
 
   IPAddress serverIP = getServerIP();
   if (serverIP == INADDR_NONE) {
-    Serial.println("Cannot resolve server address");
+    Serial.printf("postToServer: cannot resolve server address \"%s\"\n", WEB_SERVER_ADDRESS);
     return false;
   }
 
   HTTPClient http;
   char url[128];
   snprintf(url, sizeof(url), "http://%s:%s%s", serverIP.toString().c_str(), WEB_SERVER_PORT, path);
-  // Serial.printf("POST %s\n", url);
+  Serial.printf("postToServer: POST %s\n", url);
 
   http.begin(url);
   http.setTimeout(3000);
   int code = http.POST("");
-  // Serial.printf("HTTP response: %d\n", code);
+  Serial.printf("postToServer: HTTP response code = %d\n", code);
+
+  if (code < 0) {
+    Serial.printf("postToServer: connection error: %s\n", http.errorToString(code).c_str());
+  }
   http.end();
 
   return code >= 200 && code < 300;
@@ -155,33 +179,50 @@ void sendMute() {
 // Stores the response body into buf (up to bufLen-1 chars, null-terminated).
 // Returns true on HTTP 2xx response.
 bool fetchWeather(char* buf, size_t bufLen) {
+  weatherFetchCount++;
+  Serial.printf("fetchWeather: attempt #%u\n", weatherFetchCount);
+
   if (!isWiFiConnected()) {
+    Serial.println("fetchWeather: WiFi not connected, attempting reconnect...");
     maintainWiFiConnection();
     if (!isWiFiConnected()) {
-      Serial.println("fetchWeather: WiFi not connected");
+      Serial.println("fetchWeather: WiFi still not connected, aborting");
       return false;
     }
   }
 
   IPAddress serverIP = getServerIP();
   if (serverIP == INADDR_NONE) {
-    Serial.println("Cannot resolve server address");
+    Serial.printf("fetchWeather: cannot resolve server address \"%s\"\n", WEB_SERVER_ADDRESS);
     return false;
   }
 
   HTTPClient http;
   char url[128];
   snprintf(url, sizeof(url), "http://%s:%s/weather", serverIP.toString().c_str(), WEB_SERVER_PORT);
-  // Serial.printf("GET %s\n", url);
+  Serial.printf("fetchWeather: GET %s\n", url);
 
   http.begin(url);
   http.setTimeout(5000);
   int code = http.GET();
-  // Serial.printf("fetchWeather HTTP response: %d\n", code);
+  Serial.printf("fetchWeather: HTTP response code = %d\n", code);
+
+  if (code < 0) {
+    // Negative codes are transport/connection errors, not HTTP responses
+    Serial.printf("fetchWeather: connection error: %s\n", http.errorToString(code).c_str());
+    http.end();
+    return false;
+  }
 
   if (code >= 200 && code < 300) {
     String body = http.getString();
     size_t len = body.length();
+    Serial.printf("fetchWeather: received %u bytes\n", (unsigned)len);
+    if (len == 0) {
+      Serial.println("fetchWeather: empty response body");
+      http.end();
+      return false;
+    }
     if (len >= bufLen) len = bufLen - 1;
     memcpy(buf, body.c_str(), len);
     buf[len] = '\0';
@@ -189,6 +230,10 @@ bool fetchWeather(char* buf, size_t bufLen) {
     return true;
   }
 
+  // Non-2xx HTTP response — log the body for debugging
+  String body = http.getString();
+  Serial.printf("fetchWeather: non-2xx response, body (%u bytes): %s\n",
+               (unsigned)body.length(), body.c_str());
   http.end();
   return false;
 }
